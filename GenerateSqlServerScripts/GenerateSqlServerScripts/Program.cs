@@ -14,12 +14,51 @@ namespace ConsoleApplication1
 {
     class Program
     {
-        const string FilePath = "D:\\Temp\\";
-        const string SchemaFile = FilePath + "Schemas.sql";
-        const string InitDataFile = FilePath + "Init.sql";
+        public static string FilePath
+        {
+            get
+            {
+                return ConfigurationManager.AppSettings["OutputFilePath"];
+            }
+        }
+        public static int GenerateMode
+        {
+            get
+            {
+                int tmpMode = 0;
+                if (!int.TryParse(ConfigurationManager.AppSettings["GenerateMode"], out tmpMode))
+                {
+                    tmpMode = (int)GenerateModeEnum.SchemaAndData;
+                }
+                return tmpMode;
+            }
+        }
+        public static string SchemaFile
+        {
+            get
+            {
+                return FilePath + "Schema.sql";
+            }
+        }
+        public static string InitDataFile
+        {
+            get
+            {
+                return FilePath + "Init.sql";
+            }
+        }
 
         static void Main(string[] args)
         {
+            if (File.Exists(SchemaFile))
+            {
+                File.Delete(SchemaFile);
+            }
+            if (File.Exists(InitDataFile))
+            {
+                File.Delete(InitDataFile);
+            }
+
             ServerConnection serverConnection = new ServerConnection(new SqlConnection(ConfigurationManager.ConnectionStrings["conn"].ConnectionString));
             Server srv = new Server(serverConnection);
             //srv = new Server(new ServerConnection("phoenix", "sa", "sa"));
@@ -31,21 +70,30 @@ namespace ConsoleApplication1
 
             scrp.Options = GetScripterOptions();
 
-            //GenerateTables(db, scrp);
+            if (GenerateMode == (int)GenerateModeEnum.SchemaAndData || GenerateMode == (int)GenerateModeEnum.OnlySchema)
+            {
+                GenerateTables(db, scrp);
+                GenerateFunctions(db, scrp);
+                GenerateViews(db, scrp);
+                GenerateStoredProcedures(db, scrp);
+            }
 
-            //GenerateFunctions(db, scrp);
-            //GenerateViews(db, scrp);
-            //GenerateStoredProcedures(db, scrp);
-
-            GenerateInitData(db, scrp);
+            if (GenerateMode == (int)GenerateModeEnum.SchemaAndData || GenerateMode == (int)GenerateModeEnum.OnlyData)
+            {
+                GenerateInitData(db, scrp);
+            }
         }
 
-        private static void GenerateFunctions(Database db, Scripter scrp)
+        private static void GenerateTables(Database db, Scripter scrp)
         {
-            foreach (UserDefinedFunction item in db.UserDefinedFunctions)
+            Console.WriteLine("/**===== Start GenerateTables =====**/");
+            // Iterate through the tables in database and script each one. Display the script.   
+
+            List<string> list = new List<string>();
+            foreach (Table tb in db.Tables)
             {
                 // check if the table is not a system table
-                if (item.IsSystemObject == true)
+                if (tb.IsSystemObject == true)
                 {
                     continue;
                 }
@@ -53,31 +101,76 @@ namespace ConsoleApplication1
                 StringBuilder strSql = new StringBuilder();
                 scrp.Options.ScriptDrops = true;
                 // Generating script for table tb
+                StringCollection scDrop = scrp.Script(new Urn[] { tb.Urn });
+                foreach (string st in scDrop)
+                {
+                    Console.WriteLine(st);
+                    strSql.Append(st);
+                    strSql.Append(Environment.NewLine + "GO" + Environment.NewLine);
+                }
+
+                scrp.Options.ScriptDrops = false;
+                StringCollection scCreate = scrp.Script(new Urn[] { tb.Urn });
+                foreach (string st in scCreate)
+                {
+                    Console.WriteLine(st);
+                    strSql.Append(st);
+                    strSql.Append(Environment.NewLine + "GO" + Environment.NewLine);
+                }
+
+                list.Add(strSql.ToString());
+            }
+            foreach (var item in list)
+            {
+                File.AppendAllText(SchemaFile, item, Encoding.Unicode);
+            }
+
+        }
+
+        private static void GenerateFunctions(Database db, Scripter scrp)
+        {
+            List<string> list = new List<string>();
+            foreach (UserDefinedFunction item in db.UserDefinedFunctions)
+            {
+                // check if the table is not a system table
+                if (item.IsSystemObject == true)
+                {
+                    continue;
+                }
+                StringBuilder strSql = new StringBuilder();
+                scrp.Options.ScriptDrops = true;
+                // Generating script for table tb
                 System.Collections.Specialized.StringCollection sc = scrp.Script(new Urn[] { item.Urn });
                 foreach (string st in sc)
                 {
+                    Console.WriteLine(st);
                     strSql.Append(st);
-                    strSql.Append(Environment.NewLine);
-                    strSql.Append("GO");
-                    strSql.Append(Environment.NewLine);
+                    strSql.Append(Environment.NewLine + "GO" + Environment.NewLine);
                 }
 
                 scrp.Options.ScriptDrops = false;
                 sc = scrp.Script(new Urn[] { item.Urn });
                 foreach (string st in sc)
                 {
+                    Console.WriteLine(st);
                     strSql.Append(st);
-                    strSql.Append(Environment.NewLine);
-                    strSql.Append("GO");
-                    strSql.Append(Environment.NewLine);
+                    strSql.Append(Environment.NewLine + "GO" + Environment.NewLine);
                 }
-                File.AppendAllText(SchemaFile, strSql.ToString(), Encoding.Unicode);
+
+                list.Add(strSql.ToString());
+            }
+
+            foreach (var item in list)
+            {
+                File.AppendAllText(SchemaFile, item, Encoding.Unicode);
             }
         }
 
         private static void GenerateViews(Database db, Scripter scrp)
         {
             Console.WriteLine("/**===== Start GenerateViews =====**/");
+            List<string> list = new List<string>();
+
             foreach (View item in db.Views)
             {
                 // check if the table is not a system table
@@ -87,33 +180,39 @@ namespace ConsoleApplication1
                 }
 
                 StringBuilder strSql = new StringBuilder();
+
                 scrp.Options.ScriptDrops = true;
                 // Generating script for table tb
                 System.Collections.Specialized.StringCollection sc = scrp.Script(new Urn[] { item.Urn });
                 foreach (string st in sc)
                 {
+                    Console.WriteLine(st);
                     strSql.Append(st);
-                    strSql.Append(Environment.NewLine);
-                    strSql.Append("GO");
-                    strSql.Append(Environment.NewLine);
+                    strSql.Append(Environment.NewLine + "GO" + Environment.NewLine);
                 }
 
                 scrp.Options.ScriptDrops = false;
                 sc = scrp.Script(new Urn[] { item.Urn });
                 foreach (string st in sc)
                 {
+                    Console.WriteLine(st);
                     strSql.Append(st);
-                    strSql.Append(Environment.NewLine);
-                    strSql.Append("GO");
-                    strSql.Append(Environment.NewLine);
+                    strSql.Append(Environment.NewLine + "GO" + Environment.NewLine);
                 }
-                File.AppendAllText(SchemaFile, strSql.ToString(), Encoding.Unicode);
+                list.Add(strSql.ToString());
+            }
+
+            foreach (var item in list)
+            {
+                File.AppendAllText(SchemaFile, item, Encoding.Unicode);
             }
         }
 
         private static void GenerateStoredProcedures(Database db, Scripter scrp)
         {
             Console.WriteLine("/**===== Start GenerateStoredProcedures =====**/");
+
+            List<string> list = new List<string>();
             foreach (StoredProcedure item in db.StoredProcedures)
             {
                 // check if the table is not a system table
@@ -121,75 +220,43 @@ namespace ConsoleApplication1
                 {
                     continue;
                 }
-
                 StringBuilder strSql = new StringBuilder();
                 scrp.Options.ScriptDrops = true;
                 // Generating script for table tb
                 System.Collections.Specialized.StringCollection sc = scrp.Script(new Urn[] { item.Urn });
                 foreach (string st in sc)
                 {
+                    Console.WriteLine(st);
                     strSql.Append(st);
-                    strSql.Append(Environment.NewLine);
-                    strSql.Append("GO");
-                    strSql.Append(Environment.NewLine);
+                    strSql.Append(Environment.NewLine + "GO" + Environment.NewLine);
                 }
 
                 scrp.Options.ScriptDrops = false;
                 sc = scrp.Script(new Urn[] { item.Urn });
                 foreach (string st in sc)
                 {
+                    Console.WriteLine(st);
                     strSql.Append(st);
-                    strSql.Append(Environment.NewLine);
-                    strSql.Append("GO");
-                    strSql.Append(Environment.NewLine);
+                    strSql.Append(Environment.NewLine + "GO" + Environment.NewLine);
                 }
-                File.AppendAllText(SchemaFile, strSql.ToString(), Encoding.Unicode);
+                list.Add(strSql.ToString());
             }
-        }
 
-        private static void GenerateTables(Database db, Scripter scrp)
-        {
-            Console.WriteLine("/**===== Start GenerateTables =====**/");
-            // Iterate through the tables in database and script each one. Display the script.   
-            foreach (Table tb in db.Tables)
+            foreach (var item in list)
             {
-                // check if the table is not a system table
-                if (tb.IsSystemObject == true)
-                {
-                    continue;
-                }
-                StringBuilder strSql = new StringBuilder();
-                scrp.Options.ScriptDrops = true;
-                // Generating script for table tb
-                System.Collections.Specialized.StringCollection sc = scrp.Script(new Urn[] { tb.Urn });
-                foreach (string st in sc)
-                {
-                    strSql.Append(st);
-                    strSql.Append(Environment.NewLine);
-                    strSql.Append("GO");
-                    strSql.Append(Environment.NewLine);
-                }
-
-                scrp.Options.ScriptDrops = false;
-                sc = scrp.Script(new Urn[] { tb.Urn });
-                foreach (string st in sc)
-                {
-                    strSql.Append(st);
-                    strSql.Append(Environment.NewLine);
-                    strSql.Append("GO");
-                    strSql.Append(Environment.NewLine);
-                }
-                File.AppendAllText(SchemaFile, strSql.ToString(), Encoding.Unicode);
+                File.AppendAllText(SchemaFile, item, Encoding.Unicode);
             }
         }
 
         private static void GenerateInitData(Database db, Scripter scrp)
         {
             List<string> listTablesNeedData = File.ReadAllLines("TablesNeedInitData.txt").ToList<string>();
+            List<string> list = new List<string>();
 
             Console.WriteLine("/**===== Start GenerateInitData =====**/");
             scrp.Options.ScriptData = true;
             scrp.Options.ScriptSchema = false;
+            //scrp.Options.WithDependencies = true;
             //scrp.Options.IncludeHeaders = true;
             foreach (Table item in db.Tables)
             {
@@ -199,13 +266,12 @@ namespace ConsoleApplication1
                     continue;
                 }
 
-                if (!listTablesNeedData.Any(x => x.ToLower() == item.Name.ToLower()))
+                if (!listTablesNeedData.Any(x => x.Trim().ToLower() == item.Name.ToLower()))
                 {
                     continue;
                 }
 
                 StringBuilder strSql = new StringBuilder();
-
 
                 // Generating script for table tb
                 IEnumerable<string> sc = scrp.EnumScript(new Urn[] { item.Urn });
@@ -216,16 +282,22 @@ namespace ConsoleApplication1
                 }
                 foreach (string st in sc)
                 {
+                    Console.WriteLine(st);
                     strSql.Append(st);
                     if (!st.EndsWith("\r\n"))
                     {
                         strSql.Append(Environment.NewLine);
                     }
-                    strSql.Append("GO");
-                    strSql.Append(Environment.NewLine);
                 }
+                strSql.Append("GO" + Environment.NewLine);
 
                 File.AppendAllText(InitDataFile, strSql.ToString(), Encoding.Unicode);
+                //list.Add(strSql.ToString());
+            }
+
+            foreach (var item in list)
+            {
+
             }
         }
 
@@ -245,7 +317,7 @@ namespace ConsoleApplication1
 
             options.NoCollation = true;
             options.ScriptSchema = true;
-            options.WithDependencies = true;
+            //options.WithDependencies = true;
             options.DriChecks = true;
             options.DriForeignKeys = true;
             options.DriPrimaryKey = true;
@@ -254,6 +326,13 @@ namespace ConsoleApplication1
             options.DriAllConstraints = true;
 
             return options;
+        }
+
+        private enum GenerateModeEnum
+        {
+            SchemaAndData = 1,
+            OnlySchema = 2,
+            OnlyData = 3
         }
     }
 }
