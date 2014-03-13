@@ -67,6 +67,7 @@ namespace ConsoleApplication1
             //Database db = srv.Databases["CRM_8.0.1"];
             //Define a Scripter object and set the required scripting options. 
             Scripter scrp = new Scripter(srv);
+            srv.ConnectionContext.SqlExecutionModes = SqlExecutionModes.CaptureSql;
 
             scrp.Options = GetScripterOptions();
 
@@ -89,6 +90,8 @@ namespace ConsoleApplication1
             Console.WriteLine("/**===== Start GenerateTables =====**/");
             // Iterate through the tables in database and script each one. Display the script.   
 
+            string strDefaultContraints = "IF  EXISTS (SELECT * FROM sys.default_constraints WHERE object_id = OBJECT_ID(N'[dbo].[{0}]') AND parent_object_id = OBJECT_ID(N'[dbo].[{1}]'))";
+
             List<string> list = new List<string>();
             foreach (Table tb in db.Tables)
             {
@@ -100,6 +103,27 @@ namespace ConsoleApplication1
 
                 StringBuilder strSql = new StringBuilder();
                 scrp.Options.ScriptDrops = true;
+                scrp.Options.DriIncludeSystemNames = true;
+
+
+                foreach (Column col in tb.Columns)
+                {
+                    if (col.DefaultConstraint != null)
+                    {
+                        StringCollection sc = col.DefaultConstraint.Script(scrp.Options);
+                        foreach (string st in sc)
+                        {
+                            string dropConstraint = st;
+
+                            strSql.AppendFormat(strDefaultContraints, col.DefaultConstraint.Name, tb.Name);
+                            strSql.AppendFormat(Environment.NewLine + "BEGIN" + Environment.NewLine);
+                            strSql.AppendFormat(st);
+                            strSql.AppendFormat(Environment.NewLine + "END" + Environment.NewLine);
+                            strSql.AppendFormat("GO" + Environment.NewLine);
+                        }
+                    }
+                }
+
                 // Generating script for table tb
                 StringCollection scDrop = scrp.Script(new Urn[] { tb.Urn });
                 foreach (string st in scDrop)
@@ -324,7 +348,7 @@ namespace ConsoleApplication1
             options.DriUniqueKeys = true;
             options.Indexes = true;
             options.DriAllConstraints = true;
-
+            options.DriAll = true;
             return options;
         }
 
