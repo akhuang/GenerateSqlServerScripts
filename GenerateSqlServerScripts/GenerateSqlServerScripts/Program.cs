@@ -142,12 +142,13 @@ namespace ConsoleApplication1
                     strSql.Append(Environment.NewLine + "GO" + Environment.NewLine);
                 }
 
-                list.Add(strSql.ToString());
+                File.AppendAllText(SchemaFile, strSql.ToString(), Encoding.Unicode);
+                //list.Add(strSql.ToString());
             }
-            foreach (var item in list)
-            {
-                File.AppendAllText(SchemaFile, item, Encoding.Unicode);
-            }
+            //foreach (var item in list)
+            //{
+            //    //File.AppendAllText(SchemaFile, item, Encoding.Unicode);
+            //}
 
         }
 
@@ -181,13 +182,11 @@ namespace ConsoleApplication1
                     strSql.Append(Environment.NewLine + "GO" + Environment.NewLine);
                 }
 
-                list.Add(strSql.ToString());
+                //list.Add(strSql.ToString());
+
+                File.AppendAllText(SchemaFile, strSql.ToString(), Encoding.Unicode);
             }
 
-            foreach (var item in list)
-            {
-                File.AppendAllText(SchemaFile, item, Encoding.Unicode);
-            }
         }
 
         private static void GenerateViews(Database db, Scripter scrp)
@@ -223,12 +222,9 @@ namespace ConsoleApplication1
                     strSql.Append(st);
                     strSql.Append(Environment.NewLine + "GO" + Environment.NewLine);
                 }
-                list.Add(strSql.ToString());
-            }
+                //list.Add(strSql.ToString());
 
-            foreach (var item in list)
-            {
-                File.AppendAllText(SchemaFile, item, Encoding.Unicode);
+                File.AppendAllText(SchemaFile, strSql.ToString(), Encoding.Unicode);
             }
         }
 
@@ -263,13 +259,9 @@ namespace ConsoleApplication1
                     strSql.Append(st);
                     strSql.Append(Environment.NewLine + "GO" + Environment.NewLine);
                 }
-                list.Add(strSql.ToString());
+                File.AppendAllText(SchemaFile, strSql.ToString(), Encoding.Unicode);
             }
 
-            foreach (var item in list)
-            {
-                File.AppendAllText(SchemaFile, item, Encoding.Unicode);
-            }
         }
 
         private static void GenerateInitData(Database db, Scripter scrp)
@@ -317,11 +309,6 @@ namespace ConsoleApplication1
 
                 File.AppendAllText(InitDataFile, strSql.ToString(), Encoding.Unicode);
                 //list.Add(strSql.ToString());
-            }
-
-            foreach (var item in list)
-            {
-
             }
         }
 
